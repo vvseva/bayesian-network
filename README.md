@@ -6,6 +6,6 @@ model output for hill climbing algorithm.
 ![network](https://github.com/vvseva/bayesian-network/blob/master/bn1.png?raw=true)
 
 
-![questions](https://github.com/vvseva/bayesian-network/blob/master/questions.png?raw=true)
+![questions](https://github.com/vvseva/bayesian-network/blob/master/questions.jpg?raw=true)
 
 
