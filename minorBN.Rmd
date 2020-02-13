@@ -1,0 +1,196 @@
+---
+pdf_document:
+  toc: yes
+author: ''
+date: "`r Sys.Date()`"
+output:
+  html_document: null
+  code_download: yes
+  pdf_document: default
+linkcolor: violet
+number_sections: yes
+fig_caption: yes
+title: "disc-bayes1.rmd"
+theme: cosmo
+df_print: paged
+toc: yes
+toc_depth: 4
+toc_float: yes
+---
+  
+  ```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, error = F, message = F, warning = F)
+```
+
+
+
+## data
+
+get data from survey and cut some scales, translate from russian and so on
+
+```{r gpa ep}
+library(dplyr)
+library(gsheet)
+c3w2_grade <-  gsheet2tbl('docs.google.com/spreadsheets/d/1EgNHGED0dzL2akdJCa4p_pivGcBL92UFQMISnM9hbCk')
+c3w2_EP <-  gsheet2tbl('https://docs.google.com/spreadsheets/d/1EgNHGED0dzL2akdJCa4p_pivGcBL92UFQMISnM9hbCk/edit#gid=756399313')
+
+c3w2_grade <- c3w2_grade %>% select(name, ИТОГ)
+c3w2_EP <- c3w2_EP %>% select(name, ОП, ФИО)
+c3w2_EP$EP <- as.factor(c3w2_EP$ОП)
+
+c3w2_grade$Grade <- cut(c3w2_grade$ИТОГ, breaks = c(0, 6, 8, 10), labels = c("Ok", "Good", "Exellent"))
+```
+
+## networks
+
+
+```{r data}
+library(dplyr)
+library(readr)
+library(bnlearn)
+# survey1 <- read_csv("/students/aabakhitova/minor_research/minor_new/c3w1_185.csv")
+# survey2 = read_csv("/students/aabakhitova/minor_research/minor_new/c3w2_165_2.csv") 
+
+survey1 <- read_csv("~/shared/minor-research/c3w1_185.csv")
+survey2 = read_csv("~/shared/minor-research/c3w2_165_2.csv") 
+
+# write_csv(survey1, "~/model building/c3w1_185.csv")
+# write_csv(survey2, "~/model building/c3w2_165_2.csv")
+#disc = survey2 %>% dplyr::select(int6:util2, util5, self3, self2, intrinsic1, extrinsic1, costeff2:disc_cost1) %>% na.omit()
+
+# survey2 = survey2 %>% dplyr::select(username, disc_cost1, disc_interest, disc_self, disc_utility) %>% na.omit()
+# 
+# survey1 = survey1 %>% dplyr::select(username, exp1:exp4, int1:int6, util1:util5, cost1:cost6, imp1:imp4) %>% na.omit()
+```
+
+
+connect survey data with network data of a friendship
+
+```{r netw}
+data.net <- survey1 %>% select(username, friends)
+
+library(stringr)
+df_s <- str_split(data.net$friends, ",")
+data.net <- data.frame(username = rep(data.net$username, sapply(df_s, length)), friend = unlist(df_s))
+remove(df_s)
+
+data.net <- left_join(data.net, c3w2_EP, by = c("friend" = "ФИО"))
+
+# data.net %>% group_by(username) %>% summarise(outdegree = n())
+
+data.net = data.net %>% select(username, name)
+
+# data.net
+
+library(igraph)
+
+net <- graph.data.frame(data.net)
+
+indegree <- as.data.frame(igraph::degree(net, mode ="in"))
+indegree$username <- row.names(indegree)
+indegree$indegree <- indegree$`igraph::degree(net, mode = "in")`
+indegree = indegree %>% select(-`igraph::degree(net, mode = "in")`)
+indegree$indegree = cut(indegree$indegree, breaks = c(0, 2, 5, 20), labels = c("2less", "3-5", "Many"))
+outdegree <- as.data.frame(igraph::degree(net, mode ="out"))
+outdegree$username <- row.names(outdegree)
+outdegree$outdegree <- outdegree$`igraph::degree(net, mode = "out")`
+outdegree = outdegree %>% select(-`igraph::degree(net, mode = "out")`)
+outdegree$outdegree = cut(outdegree$outdegree, breaks = c(0, 2, 5, 20), labels = c("2less", "3-5", "Many"))
+
+```
+
+select only meaningfull variables
+
+```{r bn hc}
+disc = inner_join(survey1, survey2, by = c("username"))
+disc = inner_join(disc ,c3w2_grade, by = c("username"="name"))
+disc = inner_join(disc ,c3w2_EP, by = c("username"="name"))
+disc = inner_join(disc, indegree)
+disc = inner_join(disc, outdegree)
+
+rescale <- function(x_i){
+  5-x_i
+}
+
+disc$continuance3 <-  rescale(disc$continuance3)
+disc$int2 <-  rescale(disc$int2.x)
+disc$util1 <-  rescale(disc$util1)
+
+
+disc_fin <- disc %>% mutate(exp = exp1+exp2+exp3+exp4, int = int1+int2+int3+int4+int5, util=util1+util2.x+util3+util4+util5.x, costA= cost1+cost2+cost3+cost4+cost5+cost8+cost9, costB=cost6+cost7, imp=imp1+imp2+imp3+imp4, cont = continuance1 + continuance2 + continuance3 + continuance4) %>% select(exp, int, util, costA, costB,  imp, cont, disc_cost1, disc_interest, disc_self, disc_utility, Grade, EP, indegree, outdegree) %>% na.omit()
+
+
+
+b <- disc_fin[,c(-12,-13,-14, -15)]
+b <- as.data.frame(b)
+
+
+library(arules)
+
+for(i in c(1:ncol(b))){
+  b[,i] = arules::discretize(b[,i], method = 'interval', breaks = 3, debug = T, labels  = c("Low", "Medium", "High") )
+}
+
+#, labels  = c("Low", "Medium", "High")
+b$EP <- disc_fin$EP
+b$Grade <- disc_fin$Grade
+b$indegree <- disc_fin$indegree
+b$outdegree <- disc_fin$outdegree
+
+disc <- b
+
+# b$exp = arules::discretize(b$exp, method = 'interval', breaks = 3, debug = T, labels  = c("Low", "Medium", "High")) 
+
+# library(partykit)
+# 
+# r = ctree(continuance1~.-continuance2-continuance4,data=disc)
+
+
+# levels(disc$ОП)
+factor(disc$ОП)
+summary(disc$ОП)
+
+
+hc_m = hc(disc)
+plot(hc_m)
+
+
+bn.mod <- bn.fit(hc_m, data = disc)
+
+
+
+
+bn.fit.dotplot(bn.mod$exp)
+
+
+
+
+print(bn.mod$disc_self)
+```
+
+## plots
+
+for exmaple int means interest, util means utility, exp means expectancy.
+
+```{r plots}
+for (i in 1:length(bn.mod)){
+  bn.fit.barchart(bn.mod[[i]], xlab = "Probabilities",
+                  ylab = paste0("Levels of ",bn.mod[[i]][["node"]]), main = paste0("Conditional Probabilities of ", bn.mod[[i]][["parents"]]))
+}
+
+
+par(mfrow=c(2,5))
+```
+
+
+```{r hz1}
+# print(bn.mod$cont, perm = c("[6.99,11]", "(11,15]"))
+# bn.fit.dotplot(fit$d)
+```
+
+
+just a nice plot
+
+```{r norm plot}
+graphviz.plot(bn.mod, shape = "ellipse")
+```
