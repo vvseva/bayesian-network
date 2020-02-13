@@ -31,8 +31,8 @@ get data from survey and cut some scales, translate from russian and so on
 ```{r gpa ep}
 library(dplyr)
 library(gsheet)
-c3w2_grade <-  gsheet2tbl('docs.google.com/spreadsheets/d/1EgNHGED0dzL2akdJCa4p_pivGcBL92UFQMISnM9hbCk')
-c3w2_EP <-  gsheet2tbl('https://docs.google.com/spreadsheets/d/1EgNHGED0dzL2akdJCa4p_pivGcBL92UFQMISnM9hbCk/edit#gid=756399313')
+c3w2_grade <-  gsheet2tbl('REMOVED')
+c3w2_EP <-  gsheet2tbl('REMOVED')
 
 c3w2_grade <- c3w2_grade %>% select(name, ИТОГ)
 c3w2_EP <- c3w2_EP %>% select(name, ОП, ФИО)
@@ -48,8 +48,8 @@ c3w2_grade$Grade <- cut(c3w2_grade$ИТОГ, breaks = c(0, 6, 8, 10), labels = c
 library(dplyr)
 library(readr)
 library(bnlearn)
-# survey1 <- read_csv("/students/aabakhitova/minor_research/minor_new/c3w1_185.csv")
-# survey2 = read_csv("/students/aabakhitova/minor_research/minor_new/c3w2_165_2.csv") 
+# survey1 <- read_csv("/students/REMOVED/minor_research/minor_new/c3w1_185.csv")
+# survey2 = read_csv("/students/REMOVED/minor_research/minor_new/c3w2_165_2.csv") 
 
 survey1 <- read_csv("~/shared/minor-research/c3w1_185.csv")
 survey2 = read_csv("~/shared/minor-research/c3w2_165_2.csv") 
